@@ -12,4 +12,9 @@ class Category extends Model
     protected $table = 'categories';
 
     protected $fillable = ['name'];
+
+    public static function searchByCategoryName($keyword)
+    {
+        return self::where('name', $keyword)->get();
+    }
 }
