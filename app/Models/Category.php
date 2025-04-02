@@ -13,8 +13,15 @@ class Category extends Model
 
     protected $fillable = ['name'];
 
+    // Vlastná metóda na vyhľadávanie podľa názvu kategórie
     public static function searchByCategoryName($keyword)
     {
         return self::where('name', $keyword)->get();
     }
+
+    public function notes()
+    {
+        return $this->belongsToMany(Note::class, 'note_category');
+    }
+
 }

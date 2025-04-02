@@ -22,14 +22,28 @@ class CategoryController extends Controller
      */
     public function store(Request $request)
     {
-        $category = Category::create([
-            'name' => $request->name
-        ]);
+        try {
+            // Validácia vstupu
+            $validated = $request->validate([
+                'name' => 'required|string|min:2|max:64|unique:categories,name'
+            ]);
 
-        if ($category) {
-            return response()->json(['message' => 'Kategória bola vytvorená'], Response::HTTP_CREATED);
-        } else {
-            return response()->json(['message' => 'Kategória nebola vytvorená'], Response::HTTP_FORBIDDEN);
+            // Vytvorenie kategórie
+            $category = Category::create([
+                'name' => $validated['name']
+            ]);
+
+            return response()->json([
+                'message' => 'Kategória bola vytvorená',
+                'category' => $category
+            ], Response::HTTP_CREATED);
+
+        } catch (\Exception $e) {
+            // Ak validácia zlyhá, vrátime chybové hlásenie
+            return response()->json([
+                'message' => 'Chyba pri vytváraní kategórie',
+                'errors' => $e->errors()
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
 
@@ -52,17 +66,32 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $category = Category::find($id);
+        try {
+            // Validácia vstupu
+            $validated = $request->validate([
+                'name' => 'required|string|min:2|max:64|unique:categories,name,' . $id
+            ]);
 
-        if (!$category) {
-            return response()->json(['message' => 'Kategória nebola nájdená'], Response::HTTP_NOT_FOUND);
+            // Nájdeme poznámku
+            $category = Category::find($id);
+            if (!$category) {
+                return response()->json(['message' => 'Kategória nebola nájdená'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Aktualizujeme iba tie polia, ktoré sú v requeste
+            $category->update($validated);
+
+            return response()->json([
+                'message' => 'Kategória bola aktualizovaná',
+                'category' => $category
+            ], Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Chyba pri aktualizácii kategórie',
+                'errors' => $e->errors()
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
-
-        $category->update([
-            'name' => $request->name
-        ]);
-
-        return response()->json(['message' => 'Kategória bola aktualizovaná', 'note' => $category]);
     }
 
     /**
