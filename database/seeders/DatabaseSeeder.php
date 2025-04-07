@@ -38,12 +38,12 @@ class DatabaseSeeder extends Seeder
         });
 
         // Rozdelíme poznámky medzi používateľov
-//        $notes->each(function ($note, $index) use ($users) {
-//            // Vyber náhodného používateľa
-//            $user = $users[$index % $users->count()];
-//
-//            // Priradi poznámku používateľovi
-//            $user->notes()->save($note);
-//        });
+        $notes->each(function ($note, $index) use ($users) {
+            // Vyber náhodného používateľa
+            $user = $users[$index % $users->count()];
+
+            // Priradi poznámku používateľovi
+            $user->notes()->save($note);
+        });
     }
 }

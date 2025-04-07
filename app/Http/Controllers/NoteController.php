@@ -22,7 +22,21 @@ class NoteController extends Controller
 
     public function index()
     {
-        $notes = Note::with(['user', 'categories'])->orderBy('updated_at', 'desc')->get();
+        $user = auth()->user();
+
+        if ($user->isAdmin()) {
+            // Ak je admin, vrátime všetky poznámky
+            $notes = Note::with(['categories', 'user'])
+                ->orderBy('updated_at', 'desc')
+                ->get();
+        } else {
+            // Ak je normálny používateľ, vrátime iba jeho poznámky
+            $notes = Note::with(['categories'])
+                ->where('user_id', $user->id)
+                ->orderBy('updated_at', 'desc')
+                ->get();
+        }
+
         return response()->json($notes);
     }
 
@@ -51,7 +65,6 @@ class NoteController extends Controller
         try {
             // Validácia vstupu
             $validated = $request->validate([
-                'user_id' => 'required|exists:users,id',
                 'title' => 'required|string|min:5|max:255',
                 'body' => 'required|string',
                 'categories' => 'array|max:3',  // Očakáva pole kategórií
@@ -60,7 +73,7 @@ class NoteController extends Controller
 
             // Vytvorenie poznámky
             $note = Note::create([
-                'user_id' => $validated['user_id'],
+                'user_id' => auth()->id(),
                 'title' => $validated['title'],
                 'body' => $validated['body']
             ]);
@@ -70,7 +83,7 @@ class NoteController extends Controller
                 $note->categories()->sync($validated['categories']);
             }
 
-            // Načítanie poznámky aj s kategóriami a pouužívateľom
+            // Načítanie poznámky aj s kategóriami a používateľom
             $note->load(['user', 'categories']);
 
             return response()->json([
@@ -87,22 +100,29 @@ class NoteController extends Controller
         }
     }
 
-
     /**
      * Display the specified resource.
      */
     public function show($id)
     {
-        //$note = DB::table('notes')->where('id', $id)->first();
+        $user = auth()->user();
 
-        $note = Note::with(['user', 'categories'])->find($id);
+        if ($user->isAdmin()) {
+            $note = Note::with(['user', 'categories'])->find($id);
+        } else {
+            $note = Note::with(['categories'])
+                ->where('user_id', $user->id)
+                ->where('id', $id)
+                ->first();
+        }
 
         if (!$note) {
-            return response()->json(['message' => 'Poznámka nebola nájdená'], Response::HTTP_NOT_FOUND);
+            return response()->json(['message' => 'Poznámka nebola nájdená alebo nemáte oprávnenie'], Response::HTTP_NOT_FOUND);
         }
 
         return response()->json($note);
     }
+
 
     /**
      * Update the specified resource in storage.
@@ -133,21 +153,36 @@ class NoteController extends Controller
                 'categories.*' => 'exists:categories,id'
             ]);
 
-            // Nájdeme poznámku
-            $note = Note::find($id);
-            if (!$note) {
-                return response()->json(['message' => 'Poznámka nebola nájdená'], Response::HTTP_NOT_FOUND);
+            // Získanie prihláseného používateľa
+            $user = auth()->user();
+
+            // Hľadáme poznámku, buď ako admin, alebo podľa používateľa
+            if ($user->isAdmin()) {
+                $note = Note::with(['user', 'categories'])->find($id);
+            } else {
+                $note = Note::with(['categories'])
+                    ->where('user_id', $user->id)
+                    ->where('id', $id)
+                    ->first();
             }
 
-            // Aktualizujeme iba tie polia, ktoré sú v requeste
-            $note->update($validated);
+            // Ak poznámka neexistuje alebo používateľ nemá oprávnenie, vrátime chybu
+            if (!$note) {
+                return response()->json(['message' => 'Poznámka nebola nájdená alebo nemáte oprávnenie'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Aktualizácia iba tých polí, ktoré sú v requeste
+            $note->update([
+                'title' => $validated['title'],
+                'body' => $validated['body']
+            ]);
 
             // Priradenie kategórií, ak boli zadané
             if (isset($validated['categories'])) {
                 $note->categories()->sync($validated['categories']);
             }
 
-            // Načítanie poznámky s kategóriami a používateľom
+            // Načítanie poznámky aj s kategóriami a používateľom
             $note->load(['user', 'categories']);
 
             return response()->json([
@@ -158,7 +193,7 @@ class NoteController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Chyba pri aktualizácii poznámky',
-                'errors' => $e->errors()
+                'errors' => $e->getMessage() // Chybová správa pre debugging
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
@@ -180,15 +215,28 @@ class NoteController extends Controller
 
     public function destroy($id)
     {
-        $note = Note::find($id);
+        $user = auth()->user();
 
-        if (!$note) {
-            return response()->json(['message' => 'Poznámka nebola nájdená'], Response::HTTP_NOT_FOUND);
+        // Získame poznámku
+        if ($user->isAdmin()) {
+            // Admin môže vymazať akúkoľvek poznámku
+            $note = Note::find($id);
+        } else {
+            // Bežný používateľ môže vymazať len svoje poznámky
+            $note = Note::where('user_id', $user->id)->find($id);
         }
 
+        // Ak poznámka neexistuje alebo nemá oprávnenie, vrátime chybu
+        if (!$note) {
+            return response()->json(['message' => 'Poznámka nebola nájdená alebo nemáte oprávnenie'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Vymazanie poznámky
         $note->delete();
+
         return response()->json(['message' => 'Poznámka bola vymazaná']);
     }
+
 
     /**
      * Vlastné metódy
