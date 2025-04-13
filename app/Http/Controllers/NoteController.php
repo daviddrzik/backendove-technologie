@@ -193,7 +193,7 @@ class NoteController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Chyba pri aktualizácii poznámky',
-                'errors' => $e->getMessage() // Chybová správa pre debugging
+                'errors' => $e->errors() // Chybová správa pre debugging
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }

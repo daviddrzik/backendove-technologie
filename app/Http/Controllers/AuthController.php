@@ -43,12 +43,16 @@ class AuthController extends Controller
     {
         try {
             $credentials = $request->validate([
-                'email' => 'required|email',
-                'password' => 'required'
+                'email' => 'required|string|email',
+                'password' => 'required|string'
             ]);
 
             if (!Auth::attempt($credentials)) {
-                return response()->json(['message' => 'Zadaný email alebo heslo nie je správny'], Response::HTTP_UNAUTHORIZED);
+                return response()->json([
+                    'errors' => [
+                        'email' => ['Nesprávny e-mail alebo heslo.']
+                    ]
+                ], Response::HTTP_UNPROCESSABLE_ENTITY); // 422
             }
 
             $user = Auth::user();
@@ -64,7 +68,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Chyba pri prihlasovaní',
-                'error' => $e->getMessage()
+                'error' => $e->errors()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
